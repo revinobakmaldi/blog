@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "title": "Getting Started with Microsoft Fabric for Analytics Engineers",
+    "excerpt": "A hands-on walkthrough of Microsoft Fabric's lakehouse architecture and how it simplifies the modern data stack.",
+    "date": "2024-11-15",
+    "slug": "microsoft-fabric-guide",
+    "readTime": "10 min read"
+  },
+  {
+    "id": 2,
+    "title": "Deploying ML Models in Production: Lessons Learned",
+    "excerpt": "Real-world lessons from deploying machine learning models at scale — monitoring, retraining, and avoiding silent failures.",
+    "date": "2024-10-05",
+    "slug": "ml-in-production",
+    "readTime": "12 min read"
+  },
+  {
+    "id": 100,
+    "title": "Unveiling the Future: Data-Driven Technology Trends Shaping Tomorrow",
+    "excerpt": "Exploring five pivotal data-centric technology trends — from big data analytics and IoT to edge computing, data privacy, and AI-powered personalization.",
+    "date": "2023-07-26",
+    "slug": "data-driven-technology-trends",
+    "readTime": "6 min read",
+    "url": "https://www.linkedin.com/pulse/unveiling-future-data-driven-technology-trends-revino-b-akmaldi/"
+  }
+]
