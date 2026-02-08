@@ -2,66 +2,219 @@
 title: "Getting Started with Microsoft Fabric for Analytics Engineers"
 excerpt: "A hands-on walkthrough of Microsoft Fabric's lakehouse architecture and how it simplifies the modern data stack."
 date: "2024-11-15"
-readTime: "6 min read"
+readTime: "10 min read"
 ---
 
 ## What is Microsoft Fabric?
 
-Microsoft Fabric is an end-to-end analytics platform that brings together data engineering, data science, real-time analytics, and business intelligence into a single unified experience. It's built on top of OneLake — a single, unified data lake for the entire organization.
+Microsoft Fabric is an end-to-end analytics platform that brings together data engineering, data science, real-time analytics, and business intelligence into a single unified experience. It's built on top of **OneLake** — a single, unified data lake for the entire organization.
 
-## Why Analytics Engineers Should Care
+Think of it as Microsoft's answer to the fragmented modern data stack. Instead of stitching together Snowflake, dbt, Airflow, Spark, and Power BI — Fabric gives you all of that under one roof, with one security model and one billing account.
 
-If you've been juggling Snowflake, dbt, Airflow, and a BI tool, Fabric consolidates much of that stack. Here's what makes it compelling:
+## The Problem Fabric Solves
 
-- **OneLake**: One copy of data, accessible by all engines
-- **Lakehouse architecture**: Combines the best of data lakes and data warehouses
-- **Built-in notebooks**: Spark-based notebooks for transformation
-- **Dataflows Gen2**: Low-code ETL that actually works
-- **Direct Lake mode**: Power BI reads from the lakehouse without imports
+If you've worked in analytics engineering, you know the pain:
+
+- **Tool sprawl**: Separate tools for ingestion, transformation, orchestration, and BI
+- **Data copies everywhere**: The same dataset duplicated across your warehouse, lake, and BI tool
+- **Permission headaches**: Managing access across 5+ platforms with different auth models
+- **Context switching**: Writing dbt in VS Code, checking pipelines in Airflow, debugging queries in Snowflake, building dashboards in Power BI
+
+I've worked with teams where a single data pipeline touched 4 different tools before producing a dashboard. Fabric collapses that into one environment.
+
+## Core Concepts You Need to Know
+
+### OneLake: One Lake to Rule Them All
+
+OneLake is Fabric's storage layer. Every workspace automatically gets a OneLake storage account. The key insight: **all Fabric engines read from and write to the same storage**.
+
+Your Spark notebook, SQL endpoint, and Power BI report all point to the same Delta tables. No data movement, no syncing, no ETL between tools.
+
+```
+┌──────────────────────────────────────────────┐
+│                   OneLake                     │
+│                                               │
+│  ┌─────────┐  ┌─────────┐  ┌──────────────┐ │
+│  │ Bronze   │  │ Silver  │  │    Gold       │ │
+│  │ (raw)    │→ │ (clean) │→ │ (aggregated) │ │
+│  └─────────┘  └─────────┘  └──────────────┘ │
+│       ↑            ↑              ↑           │
+│    Pipelines    Notebooks     Power BI        │
+└──────────────────────────────────────────────┘
+```
+
+### Lakehouse vs. Warehouse
+
+Fabric offers both. Here's when to use each:
+
+| Feature | Lakehouse | Warehouse |
+|---------|-----------|-----------|
+| Engine | Apache Spark | T-SQL |
+| Best for | Data engineering, ML | BI queries, ad-hoc analysis |
+| File format | Delta / Parquet | Managed tables |
+| Schema | Schema-on-read | Schema-on-write |
+| Ideal user | Data engineers | Analytics engineers, analysts |
+
+My recommendation: **start with the Lakehouse**. You get a SQL endpoint for free (auto-generated over your Delta tables), so analysts can query it with T-SQL while engineers work in Spark.
 
 ## Setting Up Your First Lakehouse
 
-### 1. Create a Workspace
+### Step 1: Create a Workspace
 
-Navigate to the Fabric portal and create a new workspace. Choose the **Fabric capacity** tier that matches your needs.
+Navigate to the Fabric portal and create a new workspace. Choose a Fabric capacity — **F2** is enough for development and testing. Assign it to your workspace under Settings → License.
+
+### Step 2: Create a Lakehouse
+
+Click **New → Lakehouse**, give it a name like `analytics_lakehouse`. You'll immediately see two sections:
+
+- **Tables** — managed Delta tables (shows up in the SQL endpoint)
+- **Files** — raw file storage (CSV, JSON, Parquet — anything goes)
+
+### Step 3: Ingest Raw Data
+
+Use **Data Pipelines** for scheduled ingestion or **Dataflows Gen2** for lighter transformations. Here's a common pattern I use:
+
+1. Pipeline copies raw files from source → `Files/bronze/`
+2. Notebook reads raw files, cleans, writes to `Tables/silver_*`
+3. Notebook aggregates silver tables → `Tables/gold_*`
 
 ```python
-# Example: Reading from OneLake with PySpark
-df = spark.read.format("delta").load("Tables/sales_fact")
-df.show()
+# Step 1: Read raw CSV from the Files section
+raw_df = spark.read.format("csv") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .load("Files/bronze/sales_2024.csv")
+
+print(f"Raw records: {raw_df.count()}")
+raw_df.printSchema()
 ```
 
-### 2. Ingest Data
+### Step 4: Transform with Notebooks
 
-Use **Dataflows Gen2** or **Data Pipelines** to bring data into your lakehouse. Fabric supports connections to 150+ data sources.
+Fabric notebooks run on Apache Spark. They support PySpark, Spark SQL, Scala, and R. Here's a realistic transformation pipeline:
 
-### 3. Transform with Notebooks
+```python
+from pyspark.sql import functions as F
 
-Fabric notebooks run on Apache Spark. You can write PySpark, Spark SQL, or even use the visual query builder:
+# Read raw data
+raw_orders = spark.read.format("csv") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .load("Files/bronze/orders_*.csv")
+
+# Clean and standardize
+silver_orders = (
+    raw_orders
+    .dropDuplicates(["order_id"])
+    .filter(F.col("order_date").isNotNull())
+    .withColumn("order_date", F.to_date("order_date", "yyyy-MM-dd"))
+    .withColumn("revenue", F.col("quantity") * F.col("unit_price"))
+    .withColumn("ingested_at", F.current_timestamp())
+)
+
+# Write to Silver as Delta table
+silver_orders.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("overwriteSchema", "true") \
+    .saveAsTable("silver_orders")
+
+print(f"Silver orders: {silver_orders.count()} rows")
+```
+
+Now create the gold aggregation layer:
 
 ```sql
--- Create a curated view for reporting
-CREATE OR REPLACE VIEW gold.monthly_revenue AS
+-- Gold layer: monthly revenue summary
+CREATE OR REPLACE TABLE gold_monthly_revenue AS
 SELECT
     DATE_TRUNC('month', order_date) AS month,
+    product_category,
     SUM(revenue) AS total_revenue,
-    COUNT(DISTINCT customer_id) AS unique_customers
-FROM silver.orders
-GROUP BY 1
-ORDER BY 1 DESC;
+    COUNT(DISTINCT order_id) AS total_orders,
+    COUNT(DISTINCT customer_id) AS unique_customers,
+    ROUND(SUM(revenue) / COUNT(DISTINCT order_id), 2) AS avg_order_value
+FROM silver_orders
+WHERE order_date >= '2024-01-01'
+GROUP BY 1, 2
+ORDER BY 1 DESC, 3 DESC;
 ```
 
-### 4. Build Reports with Direct Lake
+### Step 5: Build Reports with Direct Lake
 
-Direct Lake mode lets Power BI read directly from Delta tables in your lakehouse — no import, no DirectQuery latency.
+This is where Fabric really shines. **Direct Lake mode** lets Power BI read directly from Delta tables — no import schedule, no DirectQuery latency. It's the best of both worlds.
+
+Steps:
+1. Open the SQL endpoint of your lakehouse
+2. Click **New Power BI dataset** → select your gold tables
+3. Define relationships and measures in the model
+4. Build your report
+
+Your Power BI report now reads live from the lakehouse. When your notebook updates the gold tables, the report reflects it automatically.
+
+## The Medallion Architecture in Fabric
+
+The bronze → silver → gold pattern works naturally in Fabric:
+
+**Bronze (Raw)**
+- Raw files landed via Pipelines or Dataflows
+- Stored in `Files/bronze/` — CSVs, JSONs, Parquet
+- No transformation, just a faithful copy of the source
+
+**Silver (Cleaned)**
+- Deduplication, type casting, null handling
+- Stored as Delta tables: `silver_orders`, `silver_customers`
+- Queryable via SQL endpoint
+
+**Gold (Business-Ready)**
+- Aggregated, joined, business logic applied
+- Stored as Delta tables: `gold_monthly_revenue`, `gold_customer_360`
+- Power BI connects here via Direct Lake
+
+```python
+# Orchestrate the full pipeline in a single notebook
+# Cell 1: Bronze → Silver
+raw_df = spark.read.format("csv").option("header", True).load("Files/bronze/orders_*.csv")
+silver_df = clean_and_validate(raw_df)  # your cleaning function
+silver_df.write.format("delta").mode("overwrite").saveAsTable("silver_orders")
+
+# Cell 2: Silver → Gold
+gold_df = spark.sql("""
+    SELECT
+        date_trunc('month', order_date) AS month,
+        SUM(revenue) AS total_revenue,
+        COUNT(DISTINCT customer_id) AS unique_customers
+    FROM silver_orders
+    GROUP BY 1
+""")
+gold_df.write.format("delta").mode("overwrite").saveAsTable("gold_monthly_revenue")
+```
+
+## Tips from Real-World Usage
+
+**1. Use Shortcuts for cross-workspace data**
+Shortcuts let you reference data from other lakehouses or even external storage (ADLS, S3) without copying it. This is incredibly useful for shared dimension tables.
+
+**2. Schedule notebooks with Data Pipelines**
+Don't just run notebooks manually. Create a Pipeline that runs your bronze → silver → gold notebooks in sequence, scheduled daily or triggered by file arrival.
+
+**3. Use the SQL endpoint for ad-hoc queries**
+Analysts don't need to learn PySpark. The auto-generated SQL endpoint lets them query Delta tables with familiar T-SQL. Pair it with **SQL query editor** in the Fabric portal for a zero-setup experience.
+
+**4. Leverage Semantic Models**
+Create a Semantic Model (formerly Power BI dataset) on top of your gold tables. Define measures, relationships, and KPIs once — then reuse across multiple reports.
+
+**5. Monitor with Capacity Metrics**
+Fabric capacity is shared. Use the **Capacity Metrics app** to track CU consumption per workload. Spark jobs are typically the heaviest consumers — optimize them first.
 
 ## Key Takeaways
 
-1. Fabric reduces tool sprawl for analytics teams
-2. OneLake eliminates data silos and redundant copies
-3. The lakehouse pattern gives you warehouse performance on lake storage
-4. Direct Lake mode is a game-changer for Power BI performance
+1. **Fabric reduces tool sprawl** — one platform for ingestion, transformation, and BI
+2. **OneLake eliminates data silos** — every engine reads the same Delta tables
+3. **The lakehouse pattern** gives you warehouse performance on lake-cost storage
+4. **Direct Lake mode** is a game-changer for Power BI performance — no import, no DirectQuery
+5. **Start simple** — one lakehouse, one notebook, one report. Scale when you need to
 
 ## What's Next?
 
-In the next article, we'll dive deeper into building a medallion architecture (bronze → silver → gold) in Fabric and setting up automated data quality checks.
+In the next article, we'll dive deeper into setting up automated data quality checks in Fabric using Great Expectations and building alerting workflows when your data pipelines fail silently.
