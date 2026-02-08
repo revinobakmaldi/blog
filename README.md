@@ -38,9 +38,11 @@ Your markdown content here...
 
 The slug is derived from the filename (e.g., `my-article.mdx` → `/my-article`).
 
+The landing page automatically picks up new articles — no manual syncing needed (see [Posts API](#posts-api) below).
+
 ## Adding an External Article
 
-Add an entry to the `externalPosts` array in `lib/data.ts` with a `url` field. External posts display a "Read on LinkedIn" badge and open in a new tab.
+Add an entry to the `externalPosts` array in both `lib/data.ts` and `scripts/generate-posts-json.mjs` with a `url` field. External posts display a "Read on LinkedIn" badge and open in a new tab.
 
 ## Build
 
@@ -48,7 +50,11 @@ Add an entry to the `externalPosts` array in `lib/data.ts` with a `url` field. E
 npm run build
 ```
 
-Generates a fully static site in `out/` with all article pages pre-rendered.
+A `prebuild` script automatically generates `public/api/posts.json` before each build. This generates a fully static site in `out/` with all article pages pre-rendered.
+
+## Posts API
+
+The build outputs a static JSON file at `/api/posts.json` containing metadata for all posts (internal + external), sorted by date descending. The [landing page](https://github.com/revinobakmaldi/landing-page) fetches this at build time to display the 3 latest articles, with a hardcoded fallback if the blog is unreachable.
 
 ## Project Structure
 
@@ -57,5 +63,7 @@ app/            → Pages (listing + [slug] article)
 components/     → Navbar, Footer, BlogList, Article
 content/posts/  → MDX article files
 lib/            → MDX utilities + external posts data
+scripts/        → Prebuild script (generates posts.json)
+public/api/     → Static JSON API (auto-generated)
 types/          → TypeScript interfaces
 ```
