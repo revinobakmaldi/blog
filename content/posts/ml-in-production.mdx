@@ -1,0 +1,102 @@
+---
+title: "Deploying ML Models in Production: Lessons Learned"
+excerpt: "Real-world lessons from deploying machine learning models at scale — monitoring, retraining, and avoiding silent failures."
+date: "2024-10-05"
+readTime: "7 min read"
+---
+
+## The Gap Between Notebooks and Production
+
+Every data scientist has built a model that works beautifully in a Jupyter notebook. But getting that model into production — and keeping it there — is an entirely different challenge. Here are the lessons I've learned the hard way.
+
+## Lesson 1: Your Model is Not the Product
+
+The model is maybe 5% of the system. The rest is:
+
+- Data pipelines and validation
+- Feature stores and computation
+- Serving infrastructure
+- Monitoring and alerting
+- Retraining automation
+
+```python
+# What you think ML in production looks like:
+prediction = model.predict(features)
+
+# What it actually looks like:
+features = feature_store.get_features(user_id, timeout=100)
+if features is None:
+    return fallback_prediction()
+
+prediction = model.predict(features)
+log_prediction(user_id, prediction, features)
+check_distribution_drift(features)
+```
+
+## Lesson 2: Monitor Everything
+
+Model accuracy can degrade silently. Set up monitoring for:
+
+- **Input drift**: Are incoming features changing distribution?
+- **Prediction drift**: Are outputs shifting over time?
+- **Latency**: Is the model meeting SLA requirements?
+- **Error rates**: Are predictions failing silently?
+
+```python
+from evidently import Report
+from evidently.metrics import DataDriftPreset
+
+report = Report(metrics=[DataDriftPreset()])
+report.run(reference_data=train_df, current_data=prod_df)
+report.save_html("drift_report.html")
+```
+
+## Lesson 3: Version Everything
+
+Not just your model — version your:
+
+- Training data
+- Feature engineering code
+- Model hyperparameters
+- Serving configuration
+
+```yaml
+# model_config.yaml
+model:
+  name: churn_predictor
+  version: 2.3.1
+  framework: xgboost
+  features:
+    - days_since_last_login
+    - total_purchases_30d
+    - support_tickets_open
+  threshold: 0.65
+  fallback: 0.5
+```
+
+## Lesson 4: Start Simple, Then Iterate
+
+Don't jump to Kubernetes + Kubeflow + feature stores on day one. Start with:
+
+1. **V1**: Flask API + cron job retraining
+2. **V2**: Add monitoring and alerting
+3. **V3**: Automated retraining pipeline
+4. **V4**: Feature store + A/B testing
+
+## Lesson 5: Have a Fallback
+
+Your model **will** fail in production. Have a plan:
+
+- **Rule-based fallback**: Simple heuristics when the model is down
+- **Cached predictions**: Serve the last known good prediction
+- **Graceful degradation**: Hide ML-powered features when unavailable
+
+## Key Takeaways
+
+1. Invest more in infrastructure than in model tuning
+2. Monitor prediction quality continuously, not just at deployment
+3. Version everything — data, code, config, and models
+4. Start with the simplest serving architecture that works
+5. Always have a fallback strategy
+
+The best ML system is one that fails gracefully and recovers automatically. Build for reliability first, accuracy second.

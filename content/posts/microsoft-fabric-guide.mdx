@@ -1,0 +1,67 @@
+---
+title: "Getting Started with Microsoft Fabric for Analytics Engineers"
+excerpt: "A hands-on walkthrough of Microsoft Fabric's lakehouse architecture and how it simplifies the modern data stack."
+date: "2024-11-15"
+readTime: "6 min read"
+---
+
+## What is Microsoft Fabric?
+
+Microsoft Fabric is an end-to-end analytics platform that brings together data engineering, data science, real-time analytics, and business intelligence into a single unified experience. It's built on top of OneLake — a single, unified data lake for the entire organization.
+
+## Why Analytics Engineers Should Care
+
+If you've been juggling Snowflake, dbt, Airflow, and a BI tool, Fabric consolidates much of that stack. Here's what makes it compelling:
+
+- **OneLake**: One copy of data, accessible by all engines
+- **Lakehouse architecture**: Combines the best of data lakes and data warehouses
+- **Built-in notebooks**: Spark-based notebooks for transformation
+- **Dataflows Gen2**: Low-code ETL that actually works
+- **Direct Lake mode**: Power BI reads from the lakehouse without imports
+
+## Setting Up Your First Lakehouse
+
+### 1. Create a Workspace
+
+Navigate to the Fabric portal and create a new workspace. Choose the **Fabric capacity** tier that matches your needs.
+
+```python
+# Example: Reading from OneLake with PySpark
+df = spark.read.format("delta").load("Tables/sales_fact")
+df.show()
+```
+
+### 2. Ingest Data
+
+Use **Dataflows Gen2** or **Data Pipelines** to bring data into your lakehouse. Fabric supports connections to 150+ data sources.
+
+### 3. Transform with Notebooks
+
+Fabric notebooks run on Apache Spark. You can write PySpark, Spark SQL, or even use the visual query builder:
+
+```sql
+-- Create a curated view for reporting
+CREATE OR REPLACE VIEW gold.monthly_revenue AS
+SELECT
+    DATE_TRUNC('month', order_date) AS month,
+    SUM(revenue) AS total_revenue,
+    COUNT(DISTINCT customer_id) AS unique_customers
+FROM silver.orders
+GROUP BY 1
+ORDER BY 1 DESC;
+```
+
+### 4. Build Reports with Direct Lake
+
+Direct Lake mode lets Power BI read directly from Delta tables in your lakehouse — no import, no DirectQuery latency.
+
+## Key Takeaways
+
+1. Fabric reduces tool sprawl for analytics teams
+2. OneLake eliminates data silos and redundant copies
+3. The lakehouse pattern gives you warehouse performance on lake storage
+4. Direct Lake mode is a game-changer for Power BI performance
+
+## What's Next?
+
+In the next article, we'll dive deeper into building a medallion architecture (bronze → silver → gold) in Fabric and setting up automated data quality checks.
