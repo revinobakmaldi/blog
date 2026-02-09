@@ -117,7 +117,7 @@ export default function BlogList({ posts }: { posts: BlogPost[] }) {
               </span>
             </h1>
 
-            <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
+            <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
               Insights on data products, analytics engineering, and shipping ML
               to production
             </p>
@@ -159,7 +159,7 @@ export default function BlogList({ posts }: { posts: BlogPost[] }) {
 
                   <CardWrapper
                     {...cardProps}
-                    className="relative block h-full rounded-3xl bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 shadow-xl overflow-hidden"
+                    className="relative block h-full rounded-3xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
                   >
                     {/* Gradient Header */}
                     <div className="relative h-40 overflow-hidden">
@@ -183,9 +183,9 @@ export default function BlogList({ posts }: { posts: BlogPost[] }) {
 
                       {/* Date badge */}
                       <div className="absolute top-4 left-4">
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/90 backdrop-blur-sm shadow-lg">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-lg">
                           <Calendar className="w-3.5 h-3.5 text-primary" />
-                          <span className="text-xs font-medium text-zinc-300">
+                          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                             {formatDate(post.date)}
                           </span>
                         </div>
@@ -193,9 +193,9 @@ export default function BlogList({ posts }: { posts: BlogPost[] }) {
 
                       {/* Read time badge */}
                       <div className="absolute top-4 right-4">
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/90 backdrop-blur-sm shadow-lg">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-lg">
                           <Clock className="w-3.5 h-3.5 text-accent" />
-                          <span className="text-xs font-medium text-zinc-300">
+                          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                             {post.readTime}
                           </span>
                         </div>
@@ -216,13 +216,13 @@ export default function BlogList({ posts }: { posts: BlogPost[] }) {
 
                     {/* Card Content */}
                     <div className="p-6 space-y-4">
-                      <h3 className="text-xl font-bold text-zinc-100 group-hover:text-primary transition-colors line-clamp-2">
+                      <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-primary transition-colors line-clamp-2">
                         {post.title}
                       </h3>
-                      <p className="text-zinc-400 text-sm leading-relaxed line-clamp-3">
+                      <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed line-clamp-3">
                         {post.excerpt}
                       </p>
-                      <div className="pt-4 border-t border-zinc-800">
+                      <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
                         <span className="flex items-center gap-2 text-sm font-semibold text-primary">
                           <span>
                             {isExternal ? "Read on LinkedIn" : "Read More"}

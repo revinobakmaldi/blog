@@ -71,7 +71,7 @@ export default function Article({
           {/* Back link */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-primary transition-colors mb-8"
+            className="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary transition-colors mb-8"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Articles</span>
@@ -85,7 +85,7 @@ export default function Article({
               </span>
             </h1>
 
-            <div className="flex items-center gap-4 text-sm text-zinc-400">
+            <div className="flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-primary" />
                 <span>{formatDate(date)}</span>
@@ -98,7 +98,7 @@ export default function Article({
           </header>
 
           {/* Article content */}
-          <article className="prose prose-invert prose-lg max-w-none prose-headings:bg-gradient-to-r prose-headings:from-zinc-100 prose-headings:to-zinc-300 prose-headings:bg-clip-text prose-headings:text-transparent prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-emerald-400 prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-800 prose-strong:text-zinc-200 prose-li:marker:text-primary">
+          <article className="prose dark:prose-invert prose-lg max-w-none prose-headings:bg-gradient-to-r prose-headings:from-zinc-800 prose-headings:to-zinc-600 dark:prose-headings:from-zinc-100 dark:prose-headings:to-zinc-300 prose-headings:bg-clip-text prose-headings:text-transparent prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-emerald-600 dark:prose-code:text-emerald-400 prose-pre:bg-zinc-100 dark:prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-200 dark:prose-pre:border-zinc-800 prose-strong:text-zinc-800 dark:prose-strong:text-zinc-200 prose-li:marker:text-primary">
             {children}
           </article>
 
@@ -107,7 +107,7 @@ export default function Article({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="mt-16 pt-8 border-t border-zinc-800"
+            className="mt-16 pt-8 border-t border-zinc-200 dark:border-zinc-800"
           >
             <Link
               href="/"

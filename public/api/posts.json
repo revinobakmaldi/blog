@@ -1,6 +1,14 @@
 [
   {
     "id": 1,
+    "title": "Building a Natural Language to SQL Tool That Runs Entirely in Your Browser",
+    "excerpt": "How I built Chat with Data — a tool that lets you upload a CSV, ask questions in plain English, and get SQL queries, results, and charts without your data ever leaving the browser.",
+    "date": "2026-02-09",
+    "slug": "building-natural-language-sql-tool",
+    "readTime": "10 min read"
+  },
+  {
+    "id": 2,
     "title": "Getting Started with Microsoft Fabric for Analytics Engineers",
     "excerpt": "A hands-on walkthrough of Microsoft Fabric's lakehouse architecture and how it simplifies the modern data stack.",
     "date": "2024-11-15",
@@ -8,7 +16,7 @@
     "readTime": "10 min read"
   },
   {
-    "id": 2,
+    "id": 3,
     "title": "Deploying ML Models in Production: Lessons Learned",
     "excerpt": "Real-world lessons from deploying machine learning models at scale — monitoring, retraining, and avoiding silent failures.",
     "date": "2024-10-05",
