@@ -1,0 +1,258 @@
+---
+title: "Building a Natural Language to SQL Tool That Runs Entirely in Your Browser"
+excerpt: "How I built Chat with Data — a tool that lets you upload a CSV, ask questions in plain English, and get SQL queries, results, and charts without your data ever leaving the browser."
+date: "2025-02-15"
+readTime: "10 min read"
+---
+
+## The Question That Started Everything
+
+I was sitting in a meeting when a marketing manager asked, "Can you pull how many customers in Jakarta bought more than twice last quarter?" Simple question. Took me 30 seconds to write the SQL. But here's the thing — she had the data right there in a spreadsheet on her laptop. She just couldn't ask it.
+
+This happens all the time. People sit on data they already have but need someone technical to unlock it. It's like owning a library but needing a librarian every time you want to find a book.
+
+That frustration led me to build **Chat with Data** — a tool where you upload a CSV, ask questions in plain English, and get answers back as tables and charts. No SQL knowledge needed. And here's the part I'm most proud of: **your data never leaves your browser**.
+
+## The Architecture: A Restaurant Kitchen Analogy
+
+Before diving into code, let me explain the architecture with an analogy.
+
+Imagine a restaurant where you (the customer) bring your own ingredients. The kitchen has all the equipment to cook — pans, ovens, knives — but the chef doesn't decide what to cook. Instead, there's a translator at the front who listens to what you want ("I'd like something spicy with the chicken"), walks to a recipe consultant in the back, gets a recipe, and brings it to the kitchen. The kitchen cooks it, and the translator brings the dish back to you.
+
+In this analogy:
+
+- **Your browser** is the kitchen — it has DuckDB-WASM, a full SQL engine running clientx-side
+- **The translator** is the app — it takes your question and passes context to the LLM
+- **The recipe consultant** is the LLM — it generates a SQL query based on your question and schema
+- **Your CSV** is the ingredients — it never leaves the kitchen (your browser)
+
+Here's what it actually looks like in code:
+
+```
+Browser (DuckDB-WASM)            Vercel Serverless (Python)
+┌─────────────────────┐          ┌──────────────────────┐
+│ CSV → DuckDB table  │          │ /api/chat            │
+│ Schema extraction   │─────────>│ Build system prompt  │
+│ SQL execution       │<─────────│ Call OpenRouter LLM  │
+│ Recharts rendering  │          │ Return SQL + chart   │
+└─────────────────────┘          └──────────────────────┘
+```
+
+The LLM never sees your actual data. It only receives the **schema** — column names, types, and a few sample rows — just enough to write accurate SQL.
+
+## Step 1: Bringing a SQL Database to the Browser
+
+The first problem I had to solve was: how do you run SQL queries on a CSV file without a backend? You could send the data to a server, load it into PostgreSQL, and query it there. But that means uploading potentially sensitive data to someone else's machine. For a tool that handles business data, that's a dealbreaker.
+
+Enter **DuckDB-WASM**. DuckDB is an in-process analytical database — think SQLite, but designed for analytics. The WASM version runs the entire engine inside the browser using WebAssembly.
+
+Loading a CSV into DuckDB takes just a few lines:
+
+```typescript
+export async function loadCSV(file: File): Promise<void> {
+  await db.registerFileBuffer(
+    "upload.csv",
+    new Uint8Array(await file.arrayBuffer())
+  );
+  await conn.query(
+    "CREATE TABLE uploaded_data AS SELECT * FROM read_csv_auto('upload.csv')"
+  );
+}
+```
+
+That `read_csv_auto` function is doing a lot of heavy lifting. It automatically infers column types — integers, dates, strings — without any configuration. You drop a CSV and DuckDB figures out the schema.
+
+One important detail: DuckDB-WASM runs in a **Web Worker**. This means SQL queries execute in a separate thread, so the UI stays responsive even when crunching through thousands of rows. Without this, the browser would freeze every time you ran a query.
+
+## Step 2: Teaching the LLM About Your Data
+
+Here's where it gets interesting. The LLM needs to write SQL for a table it's never seen before. Every user uploads a different CSV with different columns, types, and data patterns. So how do you give the LLM enough context to write accurate queries?
+
+The answer is a **dynamic system prompt**. After loading the CSV, I extract the schema and build a prompt on the fly:
+
+```typescript
+export function buildSystemPrompt(schema: SchemaInfo): string {
+  const columnsDesc = schema.columns
+    .map((c) => `- ${c.name} (${c.type})`)
+    .join("\n");
+
+  return `You are a SQL analyst. You write DuckDB-compatible SQL queries.
+
+TABLE: ${schema.tableName}
+TOTAL ROWS: ${schema.rowCount}
+COLUMNS:
+${columnsDesc}
+
+SAMPLE ROWS:
+${formatSampleRows(schema)}
+
+RULES:
+1. Return ONLY valid JSON with keys: sql, explanation, chart (optional)
+2. Use only SELECT statements
+3. For chart, specify: type (bar|line|pie|area), xKey, yKey, title
+4. Keep SQL concise and readable
+5. Limit results to 100 rows max`;
+}
+```
+
+Two things matter here. First, I include **sample rows** — the first 10 rows of data. Without these, the LLM would generate syntactically correct SQL but semantically wrong queries. For example, if a column called `status` contains values like `"active"`, `"churned"`, `"paused"`, the LLM needs to see those actual values to write a proper `WHERE status = 'churned'` clause.
+
+Second, I set the LLM's temperature to **0.1**. SQL generation isn't a creative writing task — you want deterministic, reliable output. A temperature of 0.7 might give you `SELECT * FROM uploaded_data WHERE status LIKE '%active%'` one time and `SELECT * FROM uploaded_data WHERE LOWER(status) = 'active'` the next. Low temperature keeps things consistent.
+
+## Step 3: The LLM Returns More Than Just SQL
+
+When the LLM responds, it doesn't just return a SQL query. It returns a structured JSON object:
+
+```json
+{
+  "sql": "SELECT department, AVG(salary) as avg_salary FROM uploaded_data GROUP BY department ORDER BY avg_salary DESC",
+  "explanation": "This shows the average salary for each department, sorted from highest to lowest.",
+  "chart": {
+    "type": "bar",
+    "xKey": "department",
+    "yKey": "avg_salary",
+    "title": "Average Salary by Department"
+  }
+}
+```
+
+The `chart` field is optional — the LLM only suggests a visualization when the data is suitable. Aggregations, comparisons, and trends get charts. A simple `SELECT *` doesn't.
+
+This structured output is what makes the experience feel magical. You ask "How does salary compare across departments?" and you get an explanation, a SQL query you can inspect, a results table, and a bar chart — all from one question.
+
+## Step 4: Executing the Query Client-Side
+
+Once the SQL comes back from the LLM, it runs entirely in the browser:
+
+```typescript
+const llmResponse = await sendChatMessage(schema, messages);
+
+let queryResult;
+if (llmResponse.sql) {
+  try {
+    queryResult = await executeQuery(llmResponse.sql);
+  } catch (err) {
+    queryError = err instanceof Error
+      ? err.message
+      : "SQL execution failed";
+  }
+}
+```
+
+If the LLM generates invalid SQL — and it occasionally does — the error gets caught and displayed to the user. No crash, no blank screen. The user can rephrase the question and try again.
+
+This is a key UX decision. The LLM is good, but it's not perfect. Maybe 1 in 20 queries has a syntax issue. Instead of pretending the system is flawless, I show the error transparently. Users are surprisingly forgiving when they can see what went wrong and retry.
+
+## The Privacy Model
+
+Let me be explicit about what data goes where, because this was a core design requirement:
+
+**Stays in the browser:**
+- Your CSV file
+- The DuckDB database
+- All SQL query execution
+- Query results and charts
+
+**Sent to the LLM (via serverless function):**
+- Column names and types
+- 10 sample rows
+- Your question
+- Conversation history
+
+Your actual data — the full dataset — never leaves the browser. The LLM only sees the scaffolding: what the table looks like, not what's inside it.
+
+This is like asking a contractor to design a bookshelf by showing them the room dimensions and a few sample books — they don't need to read every book to build a good shelf.
+
+## Things I Learned Along the Way
+
+### LLMs Are Surprisingly Good at SQL
+
+I expected to spend weeks fine-tuning prompts to get decent SQL output. In reality, modern LLMs write correct SQL about 95% of the time if you give them the schema and sample data. The remaining 5% is usually edge cases — complex date arithmetic, window functions, or ambiguous questions.
+
+The trick is the sample rows. Without them, accuracy drops significantly. The LLM needs to see that your `date` column uses `YYYY-MM-DD` format, not `DD/MM/YYYY`. It needs to know that `revenue` is in thousands, not raw numbers. Context is everything.
+
+### DuckDB-WASM Is a Game Changer
+
+Running a real SQL engine in the browser used to be a pipe dream. DuckDB-WASM handles CSV files with hundreds of thousands of rows without breaking a sweat. It supports window functions, CTEs, date arithmetic — basically everything you'd expect from a real analytical database.
+
+The only catch is the initial load. The WASM binary is about 10MB compressed. I lazy-load it after the user uploads a file, so the initial page load stays fast. A small loading screen while DuckDB initializes is a fair trade for keeping everything client-side.
+
+### Suggested Questions Bootstrap the Experience
+
+When users first upload a CSV, they often stare at the chat input not knowing what to ask. So I auto-generate starter questions based on the schema:
+
+```typescript
+export function generateSuggestedQuestions(schema: SchemaInfo): string[] {
+  const questions = ["How many rows are in the dataset?"];
+
+  const numericCols = schema.columns.filter((c) =>
+    ["INTEGER", "DOUBLE", "FLOAT", "DECIMAL"].some((t) =>
+      c.type.toUpperCase().includes(t)
+    )
+  );
+
+  const categoricalCols = schema.columns.filter((c) =>
+    c.type.toUpperCase().includes("VARCHAR")
+  );
+
+  if (numericCols.length > 0) {
+    questions.push(`What is the average ${numericCols[0].name}?`);
+  }
+
+  if (categoricalCols.length > 0 && numericCols.length > 0) {
+    questions.push(
+      `Show ${numericCols[0].name} by ${categoricalCols[0].name}`
+    );
+  }
+
+  return questions.slice(0, 4);
+}
+```
+
+If your CSV has a `salary` column (numeric) and a `department` column (text), you'll see "Show salary by department" as a suggested question. It's a small touch, but it dramatically reduces the blank-page anxiety.
+
+### The Hardest Part Was Parsing LLM Output
+
+You'd think the hardest part would be getting the LLM to write correct SQL. It wasn't. The hardest part was getting it to return **clean JSON**.
+
+LLMs love wrapping things in markdown code blocks. You ask for raw JSON and get:
+
+````
+```json
+{"sql": "SELECT ...", "explanation": "..."}
+```
+````
+
+So I had to add a cleanup step on the server:
+
+```python
+content = content.strip()
+if content.startswith("```"):
+    lines = content.split("\n")
+    lines = lines[1:]  # Remove opening fence
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]  # Remove closing fence
+    content = "\n".join(lines).strip()
+
+return json.loads(content)
+```
+
+It's not elegant, but it's necessary. This is one of those "production vs. demo" details that doesn't come up in tutorials but will bite you the moment real users touch your app.
+
+## What I'd Do Differently
+
+**Add query caching.** If five people ask "What's the average salary?", the LLM generates the same SQL five times. A simple cache keyed on the question + schema hash would save API calls and reduce latency.
+
+**Support multiple tables.** Right now, Chat with Data handles a single CSV. The natural next step is uploading multiple files — like `orders.csv` and `customers.csv` — and letting the LLM write JOINs. DuckDB can handle it; the prompt engineering just needs to account for multiple table schemas.
+
+**Add query history and export.** Users should be able to save useful queries and export results as CSV. Right now, everything lives in the chat session and disappears on refresh.
+
+## Try It Yourself
+
+Chat with Data is live at [chat-with-data-csv.vercel.app](https://chat-with-data-csv.vercel.app). Upload any CSV — your sales data, employee records, survey results — and start asking questions. There's also a sample dataset if you just want to explore.
+
+The code is open source on [GitHub](https://github.com/revinobakmaldi/chat-with-data). It's built with Next.js, DuckDB-WASM, Recharts, and a Python serverless function. If you build something with it, I'd love to hear about it.
+
+The gap between "having data" and "understanding data" shouldn't require knowing SQL. Tools like this won't replace analysts — but they'll make data accessible to everyone who needs it, which is exactly how it should be.
+
+I'd love to hear what you think. Have you tried building natural language interfaces for data? Run into the same LLM output parsing headaches? Or maybe you have a completely different approach? Reach out to me on [LinkedIn](https://linkedin.com/in/revinobakmaldi) — I'm always up for a good conversation about making data more accessible.
