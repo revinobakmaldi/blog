@@ -31,16 +31,16 @@ OneLake is Fabric's storage layer. Every workspace automatically gets a OneLake 
 Your Spark notebook, SQL endpoint, and Power BI report all point to the same Delta tables. No data movement, no syncing, no ETL between tools.
 
 ```
-┌──────────────────────────────────────────────┐
+┌──────────────────────────────────────────────-┐
 │                   OneLake                     │
 │                                               │
-│  ┌─────────┐  ┌─────────┐  ┌──────────────┐ │
-│  │ Bronze   │  │ Silver  │  │    Gold       │ │
-│  │ (raw)    │→ │ (clean) │→ │ (aggregated) │ │
-│  └─────────┘  └─────────┘  └──────────────┘ │
+│  ┌─────────┐  ┌─────────┐  ┌──────────────┐   │
+│  │ Bronze  │  │ Silver  │  │    Gold      │   │
+│  │ (raw)   │→ │ (clean) │→ │ (aggregated) │   │
+│  └─────────┘  └─────────┘  └──────────────┘   │
 │       ↑            ↑              ↑           │
 │    Pipelines    Notebooks     Power BI        │
-└──────────────────────────────────────────────┘
+└──────────────────────────────────────────────-┘
 ```
 
 ### Lakehouse vs. Warehouse
