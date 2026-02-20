@@ -1,5 +1,13 @@
 [
   {
+    "id": 4,
+    "title": "Vibecoding an AI Product from Scratch: How I Built Resume-Lens with Claude Code",
+    "excerpt": "I'm not a developer. But two months ago I watched a YouTube video that made me think — what if I just tried? Here's how I built a real AI product using nothing but prompts and Claude Code.",
+    "date": "2026-02-20",
+    "slug": "vibecoding-ai-product-resume-lens",
+    "readTime": "13 min read"
+  },
+  {
     "id": 1,
     "title": "Building a Natural Language to SQL Tool That Runs Entirely in Your Browser",
     "excerpt": "How I built Chat with Data — a tool that lets you upload a CSV, ask questions in plain English, and get SQL queries, results, and charts without your data ever leaving the browser.",
