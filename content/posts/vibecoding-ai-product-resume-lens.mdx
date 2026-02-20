@@ -9,41 +9,44 @@ readTime: "13 min read"
 
 About two months ago I was doing my usual late-night YouTube rabbit hole when I stumbled on a video from **Peter Yang** interviewing a creator named **Alex Finn**. I almost scrolled past it.
 
-The thumbnail said something about Claude Code and a "life operating system." I clicked mostly out of curiosity.
+The thumbnail said something about Claude Code and a "life operating system." I clicked mostly out of curiosity. (If you want to watch it yourself: [Full Tutorial: Build an AI Life Co-Pilot with Claude Code in 25 Minutes](https://youtu.be/D0nDWQdN3F4))
 
 I watched Alex walk through how he had built a system — running entirely in his terminal — that acted like an autonomous employee. Custom slash commands. Sub-agents that browse the web, scrape competitor content, and draft reports in his specific writing voice. He had it tracking his personal goals, analyzing his mood patterns over time, generating daily industry briefings. The whole thing.
 
-And here's the part that stopped me cold: **Alex said he's not a software engineer.**
+My first reaction wasn't "I want to build a product." It was simpler than that — I just wanted to copy what he was doing.
 
-He was describing this like it was obvious. Like of course you can build all of this without writing code yourself. He just described what he wanted, Claude Code did the building, and he reviewed the output. He called it something I hadn't heard before — **vibecoding**.
+Some of his use cases felt immediately relevant to my life. The newsletter researcher that scans industry content on a schedule. The daily check-in that tracks mood and goals over time. The morning briefing that pulls together news in a specific domain. I thought: I could use all of that. I don't need to be a developer to set up my own version of this system.
 
-I sat there after the video ended and genuinely didn't know what to do with that feeling.
+So I opened my terminal and started trying.
 
-I've spent years being someone who has product ideas and then immediately shelves them because "I'd need a developer for that." I work with data and strategy. I can write SQL. I understand how systems work conceptually. But actually building a product, from scratch, with a real UI and an API and users? That always felt like it belonged to a different category of person.
+And somewhere in that process of just trying to replicate his setup — tinkering, prompting, watching things actually get built — something shifted. I realized the gap between where I was and a shipped product was much smaller than I'd always assumed.
 
-Alex Finn broke that belief in about 30 minutes of YouTube content.
+I've spent years being someone who has product ideas and then immediately shelves them because "I'd need a developer for that." I work with data and strategy. I can write SQL. I understand how systems work conceptually. But actually building a product, from scratch, with a real UI and an API? That always felt like it belonged to a different category of person.
 
-So I closed my laptop, went to bed, and spent the next week thinking about what I would actually build if I could build anything.
+Turns out the category was mostly in my head. And once I saw that, I stopped trying to replicate someone else's setup and started thinking about what I actually wanted to build for myself.
 
 ---
 
 ## The Idea: Resume-Lens
 
-The problem I kept coming back to was one I'd seen play out with a lot of people around me.
+The problem didn't come from reading a blog post or brainstorming in a notes app. It came from something I was dealing with at work.
 
-You apply for a job. You spend an hour tailoring your resume. You hit send. And then — nothing. Not even a rejection email, just silence. You have no idea if it was your experience, your formatting, the keywords you used, or if your resume was even read by a human at all.
+I was hiring more analysts for my team. I'd put out a job posting, and the applications started flooding in — dozens of them, all arriving by email. Resumes as attachments. Varying formats, varying lengths, wildly varying quality. No structure. No easy way to filter.
 
-Most people just update a line or two and apply again. They're optimizing blind.
+The problem wasn't finding candidates. The problem was that I was spending an embarrassing amount of time just trying to figure out which resumes were worth reading closely. I'd open an attachment, skim it, try to hold the job description in my head at the same time, make a snap call, and move on. Multiply that by 40 applicants and it starts to feel like a full-time job on top of your actual job.
 
-**Resume-Lens** is my answer to that. The idea is simple:
+I kept thinking: someone should be doing a first pass on these before they get to me. Not rejecting people — just flagging how well each resume actually matches what I said I was looking for. Keywords, experience level, skills. Basic stuff that takes a human 5 minutes per resume and an AI about 5 seconds.
 
-1. You paste your resume (or upload a PDF)
-2. You paste the job description you're applying for
-3. The tool tells you how well they match — with a score, a breakdown of skill gaps, missing keywords, and specific suggestions for what to rewrite
+So I built it. Not for job seekers — for myself, as a hiring manager trying to not drown in email.
 
-It's not a "make your resume better" tool. It's a "for *this specific job*, here's what's working and what isn't" tool. The context of the target role is what makes the feedback actually useful.
+**Resume-Lens** is a platform for hiring managers — not job seekers:
 
-I had this idea sitting in a notes app for almost a year. Two months ago, after that video, I finally decided to build it.
+1. You create a job posting, write the technical requirements, and define your scoring criteria — things like "minimum 3 years experience," "Bachelor's degree or higher," "related experience in data analysis"
+2. You upload batches of PDF resumes from candidates — drag, drop, done
+3. The tool extracts structured data from each PDF (name, education, total experience, last company, and more), then scores every candidate against your criteria and requirements
+4. You get a ranked, filterable candidate table — sorted by score, searchable by name or education — so you can decide who's worth interviewing without opening a single attachment manually
+
+It's not a "make your resume better" tool. It's a "I have 40 resumes in my inbox, show me the top 10 worth interviewing" tool. The filtering layer I needed but couldn't find anywhere.
 
 ---
 
@@ -77,7 +80,7 @@ That's it. You're now in a conversation with something that has full access to y
 
 My first message to it was embarrassingly non-technical:
 
-> *"I want to build a web app called Resume-Lens. Users paste their resume and a job description. Claude API analyzes them and returns a match score, a list of missing keywords, a breakdown of skill gaps, and specific rewrite suggestions for their resume. Build it as a Next.js app with a clean UI."*
+> *"I want to build a hiring platform called Resume-Lens for internal use. Hiring managers upload PDF resumes, the app extracts structured candidate data using an AI API, stores everything in a Supabase database, and scores candidates against job-specific criteria. Build it as a Next.js app with a Python backend for the AI and PDF parsing, with a dashboard to manage multiple job postings."*
 
 And then I watched it go.
 
@@ -93,130 +96,143 @@ What I noticed immediately: it made reasonable decisions without asking me for e
 
 ```
 resume-lens/
-├── app/
-│   ├── page.tsx          # Main input UI
-│   ├── layout.tsx        # Root layout
-│   └── api/
-│       └── analyze/
-│           └── route.ts  # API route to call Claude
+├── api/                        # Python serverless functions (Vercel)
+│   ├── auth.py                 # Password gate
+│   ├── parse.py                # PDF extraction + AI parsing
+│   ├── candidates.py           # Candidate CRUD
+│   ├── jobs.py                 # Job CRUD
+│   ├── score.py                # Hybrid scoring engine
+│   └── share.py                # Shareable link generation
+├── app/                        # Next.js App Router
+│   ├── page.tsx                # Login
+│   ├── layout.tsx
+│   ├── dashboard/              # Job list + stats
+│   ├── jobs/
+│   │   ├── new/                # Create job form
+│   │   ├── [id]/               # Job detail + candidate table
+│   │   └── [id]/upload/        # PDF upload
+│   ├── candidates/
+│   │   ├── page.tsx            # All candidates (cross-job)
+│   │   └── [id]/               # Candidate detail + scores
+│   └── share/[token]/          # Public read-only view
 ├── components/
-│   ├── ResumeInput.tsx
-│   ├── JobDescInput.tsx
-│   └── ResultsPanel.tsx
-├── lib/
-│   └── claude.ts         # Claude API wrapper
-└── types/
-    └── index.ts
+│   ├── shared/
+│   ├── jobs/                   # JobForm, CriteriaBuilder, ShareButton
+│   ├── candidates/             # CandidateTable, ScoreBadge, Filters
+│   └── upload/                 # PdfDropzone, UploadProgress
+└── lib/
+    ├── api.ts                  # API client wrappers
+    ├── types.ts
+    └── auth.ts                 # Session storage auth
 ```
 
-### Step 2 — Building the Input UI
+### Step 2 — Building the Job Creation and Upload UI
 
-I asked it to build two input areas — one for the resume, one for the job description — with a big "Analyze" button. I told it I wanted it to look clean and professional, not like a hackathon project.
+The app needed two main interfaces: a form for creating a job posting (with a criteria builder), and an upload page for dropping in PDF resumes.
 
-It built the components. I looked at the result in my browser and immediately had feedback:
+The criteria builder was the interesting part. I wanted hiring managers to be able to define their own scoring rules without writing code — things like "total experience must be at least 3 years" or "education must be at least Bachelor's." Each rule gets a weight, and the weights have to sum to 100%.
 
-> *"The two text areas are side by side but on mobile they're too cramped. Stack them vertically on mobile. Also the button color feels too generic — make it feel more premium."*
+I gave Claude Code a rough sketch of what I wanted:
 
-It adjusted. I gave it more feedback. We went back and forth maybe four times on the UI before it felt right. This is the part that clicked for me — the iteration loop. You're not writing CSS. You're having a design conversation.
+> *"Build a criteria builder UI where users can add rows. Each row has a field dropdown (experience, education, age, etc.), an operator dropdown (`>=`, `<=`, `=`), a value input, and a weight input. Add validation that the weights must sum to 100% before the form can submit."*
 
-### Step 3 — Connecting the Claude API
+It built the component. The validation logic — checking the sum in real-time and blocking submission — it figured out on its own. I just told it what the constraint was.
 
-This is where I expected things to fall apart, but it was actually the smoothest part.
+For the upload page, I described a PDF dropzone with drag-and-drop support, a list showing upload progress per file, and a preview of the extracted data once parsing was done. The iteration there was mostly visual — spacing, status indicators, making the parsed preview feel readable rather than raw JSON on screen.
 
-Claude Code wrote a server-side API route that takes the resume text and job description, constructs a detailed prompt, calls the Claude API, and returns structured JSON back to the frontend.
+### Step 3 — Connecting the AI: Two Separate Jobs
 
-The prompt it wrote for the analysis was genuinely good:
+This is where the architecture got interesting. The AI does two distinct things in Resume-Lens, and they needed two separate Python functions.
 
-```typescript
-const systemPrompt = `You are an expert resume coach and hiring specialist with
-15 years of experience screening candidates. Analyze the provided resume against
-the job description and return a structured assessment.
+**First: parsing.** When a PDF is uploaded, `parse.py` extracts the raw text using PyPDF2, then sends it to the LLM to pull out structured fields — name, email, education, total years of experience, related experience, last company. The model used is Qwen3 VL 235B via OpenRouter, running at low temperature so the extraction is consistent.
 
-Return JSON with this exact structure:
-{
-  "matchScore": number (0-100),
-  "summary": string (2-3 sentences overall assessment),
-  "keywordAnalysis": {
-    "present": string[],
-    "missing": string[],
-    "recommended": string[]
-  },
-  "skillGaps": {
-    "critical": string[],
-    "nice_to_have": string[]
-  },
-  "sectionFeedback": {
-    "experience": string,
-    "skills": string,
-    "education": string
-  },
-  "rewriteSuggestions": {
-    "section": string,
-    "original": string,
-    "suggested": string,
-    "reason": string
-  }[]
-}`
+The extraction prompt Claude Code wrote:
+
+```python
+system_prompt = """Extract candidate information from the resume text and return JSON only.
+Fields: name (Proper Case), email, phone, gender, age, last_education,
+last_company, total_experience (decimal years), related_experience (decimal years).
+Handle both Indonesian and English resumes.
+For age: calculate from birth date if available, or estimate from education start year
+(assume Bachelor's starts at 18). Return null only if no date information exists.
+Return raw JSON only, no markdown."""
 ```
 
-I didn't write that. Claude Code wrote that prompt, looking at what I said the product should do. I reviewed it, thought it looked right, and moved on. The idea that an AI writes the prompts for the AI is one of the weirder meta things about vibecoding.
+The bilingual handling was something I asked for specifically — most of our applicants write resumes in Indonesian, and I needed the parser to handle both.
+
+**Second: scoring.** After candidates are saved, `score.py` runs a hybrid evaluation: 60% from the criteria the hiring manager defined (evaluated with hard logic — experience >= 3, education rank >= Bachelor, etc.), and 40% from an LLM that reads the resume against the job requirements and returns a 0-100 relevance score.
+
+```python
+# Simplified scoring logic
+criteria_score = evaluate_criteria(candidate, job.criteria)   # 0-100
+ai_score = call_llm_relevance(candidate.raw_text, job.requirements)  # 0-100
+total = (criteria_score * 0.6) + (ai_score * 0.4)
+```
+
+The 60/40 split was my decision, not Claude Code's. I wanted the structured rules to dominate — if I say I need someone with at least 3 years of experience, a great essay score shouldn't override that. The AI relevance portion is a tiebreaker more than anything else.
+
+I didn't write any of that Python. I described the logic I wanted, Claude Code implemented it, and I reviewed whether the math and the intent matched. That's the whole workflow.
 
 ### Step 4 — Displaying the Results
 
-I asked for a results panel that displayed all of this in a readable, human-friendly way. Not raw JSON. I wanted:
+The candidate table was the most important UI piece — it's the thing I'd actually be staring at every day. I wanted it to be sortable by any column, filterable by field (score, education level, years of experience), and searchable by name or company.
 
-- A big score circle at the top (like a progress ring, 0-100)
-- Color-coded keyword chips (green = present, red = missing)
-- Expandable sections for skill gaps and section feedback
-- Rewrite suggestions shown as before/after comparisons
+I asked for:
+- A score badge per candidate, color-coded (red for low, green for high)
+- Clickable column headers for sorting
+- A filter builder where I can stack conditions ("score >= 70 AND education = Bachelor")
+- A candidate detail page showing the per-criteria score breakdown alongside the raw extracted resume text
 
-It built all of it. Some of the component structure it chose was cleaner than what I would have asked for. The before/after comparison cards in particular looked better than what I had in my head.
+Claude Code built the sortable table and filter UI without much trouble. The part that took more iteration was the score breakdown on the candidate detail page — showing how much of the score came from each criterion versus the AI relevance portion, in a way that actually made sense visually.
+
+There's also a shareable link feature — I can generate a read-only URL for a job and send it to a colleague, and they can see the ranked candidate list without needing to log in. That one I asked for as an afterthought and it was built in about 15 minutes.
 
 ### Step 5 — The Parts That Broke (And How We Fixed Them)
 
 I'm not going to pretend it was frictionless. A few things broke.
 
-**Problem 1:** The API route was returning the Claude response as a raw string, not parsed JSON. The frontend was crashing trying to render it.
+**Problem 1:** The LLM was returning JSON with markdown code fences around it — the response would come back as ` ```json { ... } ``` ` instead of raw JSON. The parser was crashing trying to feed that directly into `json.loads()`.
 
-I just told Claude Code what was happening:
+> *"The parse endpoint is crashing on some resumes. The LLM is wrapping the JSON in markdown code fences and we're not stripping them before parsing."*
 
-> *"The analyze endpoint is returning a string, not parsed JSON. The ResultsPanel is throwing an error when it tries to access matchScore."*
+Claude Code added a cleanup step that strips fences, handles truncated responses (where the LLM cuts off mid-JSON), and as a last resort returns a null object instead of crashing. That logic is still in the code today — it catches edge cases I didn't anticipate.
 
-It found the bug — it was missing a `JSON.parse()` call and wasn't handling the case where Claude's response had markdown code fences around the JSON. Fixed in about 30 seconds.
+**Problem 2:** Bulk scoring was slow and there was no feedback while it was running. If I kicked off scoring for 30 candidates, the page just froze.
 
-**Problem 2:** Long resumes were hitting Anthropic's token limits and returning incomplete responses.
+> *"Scoring 30 candidates with no progress feedback feels broken. Can you make it score them one by one and update the UI after each one completes — show a progress bar or status per candidate?"*
 
-> *"Some resumes are too long and the API call is failing. Can you add a check that trims the resume to a reasonable token count before sending, and show a warning to the user if we had to truncate it?"*
+It reworked the scoring flow to process candidates sequentially and update state after each one, so the table fills in progressively. Much better.
 
-Done. It added a token estimation function and a yellow warning banner.
+**Problem 3:** The OpenRouter API was occasionally returning rate limit errors (429) during bulk scoring runs.
 
-**Problem 3:** The PDF upload I asked for initially just wasn't working right. Parsing PDFs in a Next.js API route has a bunch of edge cases.
-
-This one I made a call on: I dropped PDF support from the MVP. I asked Claude Code to replace the file upload with a plain textarea and add a note that says "Copy-paste your resume text here." Not every problem needs to be solved on day one.
-
-That's still vibecoding — knowing when to descope instead of debugging forever.
+This one Claude Code caught before I even noticed — when I described the bulk scoring architecture, it preemptively added exponential backoff retry logic to the scoring function. Three attempts, waiting 3 seconds then 6 seconds between retries. I asked where that came from and it explained that rate limit handling is standard practice for API calls in a loop. Good instinct.
 
 ---
 
 ## What Resume-Lens Actually Does Now
 
-Here's the current state of the product:
+Here's the current state of the product.
 
-You land on the page and see two large text areas. Left side is your resume, right side is the job description. You hit **Analyze Resume**.
+You log in with a password (no user accounts — it's just for me and anyone I share access with). You land on a dashboard showing all your active job postings and total candidate counts.
 
-In a few seconds you get back:
+You create a job by writing the title, a description, the technical requirements (used for AI evaluation), and your scoring criteria. The criteria builder lets you add rules like:
+- Total experience >= 3 years (weight: 40%)
+- Education >= Bachelor's (weight: 35%)
+- Related experience >= 1 year (weight: 25%)
 
-**A match score** — a number from 0 to 100, color-coded (red below 50, yellow 50-75, green above 75). I've found most first-draft resumes score in the 40-60 range against specific job descriptions, even when the person is genuinely qualified.
+Those weights must sum to 100%. That constraint enforces you to actually think about what matters most for the role.
 
-**Keyword analysis** — a grid of chips showing which keywords from the job description appear in your resume, which are missing, and which are recommended additions that aren't in either but are common in the role. The missing keywords section is usually the most eye-opening part.
+Then you go to the upload page, drop in PDF resumes — one at a time or a whole batch — and the app does two things per file: extracts structured candidate data (name, education, years of experience, last company, etc.), then saves it to the database. The parsing handles both Indonesian and English resumes, which matters for my team.
 
-**Skill gap breakdown** — separated into "critical" (stuff the job explicitly requires that you didn't mention) and "nice to have" (skills that would strengthen the application).
+Once candidates are uploaded, you run scoring. You can score all at once or select specific candidates. Each gets a score from 0 to 100:
+- **60% from your criteria** — hard logic, evaluated exactly as you defined it. Experience >= 3 years: pass or partial credit. Education below your minimum: penalized proportionally.
+- **40% from AI relevance** — the model reads the resume against your requirements and rates how well the candidate actually fits the role.
 
-**Section-by-section feedback** — specific commentary on your experience section, skills section, and education. Not generic advice like "be more specific" — contextual advice like "your experience section mentions project management but doesn't quantify any outcomes, which this role specifically calls for."
+The result is a ranked candidate table. You can sort by score, filter by education level or experience, and search by name or company. Click any candidate to see the full breakdown: how they scored on each criterion, what the AI said about their relevance, and the raw text extracted from their resume.
 
-**Rewrite suggestions** — these are the most useful. It finds specific bullet points or sentences in your resume and suggests how to rewrite them for this job. Shows the original text, the suggested replacement, and why the change helps.
+There's also a share feature — generate a read-only link for any job and send it to someone who doesn't have login access. They see the same ranked table, no editing.
 
-The whole analysis takes about 8-12 seconds. And every time I test it on a new combination, I learn something about how resume screening actually works.
+The whole flow — from uploading a batch of resumes to having a ranked shortlist — takes maybe 5 minutes depending on how many candidates you're processing.
 
 ---
 
@@ -252,7 +268,9 @@ If you're reading this and you're like me — you have product ideas, you unders
 
 ## What's Next for Resume-Lens
 
-I'm planning to add PDF parsing properly — there are good libraries for it, I just need to commit the time to getting it right. I also want to add a "rewrite mode" where you can take a specific section, paste it in, and get a fully rewritten version optimized for a target role.
+The immediate thing I want to add is email ingestion — right now I still have to manually download attachments and upload them. The dream is a forwarding address: send candidate emails there and they parse and land automatically.
+
+I also want to improve the scoring calibration. The 60/40 split between criteria and AI relevance works, but I want to be able to tune it per job. Some roles are highly criteria-driven (you need exactly X years), others are more holistic. A slider to adjust the weight per posting would make the tool more flexible.
 
 Eventually I want to think about whether there's a business here. But right now, honestly, the point was to prove to myself that I could build something real.
 
