@@ -1,0 +1,269 @@
+---
+title: "Vibecoding an AI Product from Scratch: How I Built Resume-Lens with Claude Code"
+excerpt: "I'm not a developer. But two months ago I watched a YouTube video that made me think — what if I just tried? Here's how I built a real AI product using nothing but prompts and Claude Code."
+date: "2026-02-20"
+readTime: "13 min read"
+---
+
+## It Started With a YouTube Video
+
+About two months ago I was doing my usual late-night YouTube rabbit hole when I stumbled on a video from **Peter Yang** interviewing a creator named **Alex Finn**. I almost scrolled past it.
+
+The thumbnail said something about Claude Code and a "life operating system." I clicked mostly out of curiosity.
+
+I watched Alex walk through how he had built a system — running entirely in his terminal — that acted like an autonomous employee. Custom slash commands. Sub-agents that browse the web, scrape competitor content, and draft reports in his specific writing voice. He had it tracking his personal goals, analyzing his mood patterns over time, generating daily industry briefings. The whole thing.
+
+And here's the part that stopped me cold: **Alex said he's not a software engineer.**
+
+He was describing this like it was obvious. Like of course you can build all of this without writing code yourself. He just described what he wanted, Claude Code did the building, and he reviewed the output. He called it something I hadn't heard before — **vibecoding**.
+
+I sat there after the video ended and genuinely didn't know what to do with that feeling.
+
+I've spent years being someone who has product ideas and then immediately shelves them because "I'd need a developer for that." I work with data and strategy. I can write SQL. I understand how systems work conceptually. But actually building a product, from scratch, with a real UI and an API and users? That always felt like it belonged to a different category of person.
+
+Alex Finn broke that belief in about 30 minutes of YouTube content.
+
+So I closed my laptop, went to bed, and spent the next week thinking about what I would actually build if I could build anything.
+
+---
+
+## The Idea: Resume-Lens
+
+The problem I kept coming back to was one I'd seen play out with a lot of people around me.
+
+You apply for a job. You spend an hour tailoring your resume. You hit send. And then — nothing. Not even a rejection email, just silence. You have no idea if it was your experience, your formatting, the keywords you used, or if your resume was even read by a human at all.
+
+Most people just update a line or two and apply again. They're optimizing blind.
+
+**Resume-Lens** is my answer to that. The idea is simple:
+
+1. You paste your resume (or upload a PDF)
+2. You paste the job description you're applying for
+3. The tool tells you how well they match — with a score, a breakdown of skill gaps, missing keywords, and specific suggestions for what to rewrite
+
+It's not a "make your resume better" tool. It's a "for *this specific job*, here's what's working and what isn't" tool. The context of the target role is what makes the feedback actually useful.
+
+I had this idea sitting in a notes app for almost a year. Two months ago, after that video, I finally decided to build it.
+
+---
+
+## What is Vibecoding, Actually?
+
+Before I get into the how, let me explain vibecoding the way I understand it — because when I first heard the term I thought it was some gimmick.
+
+Vibecoding is coding by intent instead of by syntax. You describe *what you want to happen* in plain language, and you let an AI write the actual code. You're not passively watching it generate random stuff — you're directing it. You review what it produces. You push back when it's wrong. You steer it toward the right solution.
+
+The "vibe" part is real, though. There's something about the flow of it that feels different from traditional development. You're not context-switching between documentation, Stack Overflow, and your editor. You're having a conversation with something that already knows all of that, and your job is to be clear about what you actually want.
+
+For non-developers like me, the mental shift is big. You stop thinking "I need to learn how to code this" and start thinking "I need to clearly describe what this should do." Those are very different problems. The second one is one I already know how to solve.
+
+---
+
+## Setting Up Claude Code
+
+I'll be honest — even setting up Claude Code felt intimidating at first. But it's really just a CLI tool you install once.
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+You'll need Node.js installed and an Anthropic API key. Once you have both, you navigate to wherever you want your project to live and run:
+
+```bash
+claude
+```
+
+That's it. You're now in a conversation with something that has full access to your file system, can write code, run commands, read errors, and fix itself. It feels a little surreal the first time.
+
+My first message to it was embarrassingly non-technical:
+
+> *"I want to build a web app called Resume-Lens. Users paste their resume and a job description. Claude API analyzes them and returns a match score, a list of missing keywords, a breakdown of skill gaps, and specific rewrite suggestions for their resume. Build it as a Next.js app with a clean UI."*
+
+And then I watched it go.
+
+---
+
+## Step by Step: Building Resume-Lens
+
+### Step 1 — Scaffolding the Project
+
+Claude Code started by initializing a Next.js project with TypeScript and Tailwind CSS. It set up the folder structure, configured the app router, and got the dev server running. This part took maybe two minutes and zero input from me beyond that first prompt.
+
+What I noticed immediately: it made reasonable decisions without asking me for every little thing. It picked sensible defaults. I didn't have to know that `app/` router exists or what `tailwind.config.ts` is supposed to look like. It just set those up.
+
+```
+resume-lens/
+├── app/
+│   ├── page.tsx          # Main input UI
+│   ├── layout.tsx        # Root layout
+│   └── api/
+│       └── analyze/
+│           └── route.ts  # API route to call Claude
+├── components/
+│   ├── ResumeInput.tsx
+│   ├── JobDescInput.tsx
+│   └── ResultsPanel.tsx
+├── lib/
+│   └── claude.ts         # Claude API wrapper
+└── types/
+    └── index.ts
+```
+
+### Step 2 — Building the Input UI
+
+I asked it to build two input areas — one for the resume, one for the job description — with a big "Analyze" button. I told it I wanted it to look clean and professional, not like a hackathon project.
+
+It built the components. I looked at the result in my browser and immediately had feedback:
+
+> *"The two text areas are side by side but on mobile they're too cramped. Stack them vertically on mobile. Also the button color feels too generic — make it feel more premium."*
+
+It adjusted. I gave it more feedback. We went back and forth maybe four times on the UI before it felt right. This is the part that clicked for me — the iteration loop. You're not writing CSS. You're having a design conversation.
+
+### Step 3 — Connecting the Claude API
+
+This is where I expected things to fall apart, but it was actually the smoothest part.
+
+Claude Code wrote a server-side API route that takes the resume text and job description, constructs a detailed prompt, calls the Claude API, and returns structured JSON back to the frontend.
+
+The prompt it wrote for the analysis was genuinely good:
+
+```typescript
+const systemPrompt = `You are an expert resume coach and hiring specialist with
+15 years of experience screening candidates. Analyze the provided resume against
+the job description and return a structured assessment.
+
+Return JSON with this exact structure:
+{
+  "matchScore": number (0-100),
+  "summary": string (2-3 sentences overall assessment),
+  "keywordAnalysis": {
+    "present": string[],
+    "missing": string[],
+    "recommended": string[]
+  },
+  "skillGaps": {
+    "critical": string[],
+    "nice_to_have": string[]
+  },
+  "sectionFeedback": {
+    "experience": string,
+    "skills": string,
+    "education": string
+  },
+  "rewriteSuggestions": {
+    "section": string,
+    "original": string,
+    "suggested": string,
+    "reason": string
+  }[]
+}`
+```
+
+I didn't write that. Claude Code wrote that prompt, looking at what I said the product should do. I reviewed it, thought it looked right, and moved on. The idea that an AI writes the prompts for the AI is one of the weirder meta things about vibecoding.
+
+### Step 4 — Displaying the Results
+
+I asked for a results panel that displayed all of this in a readable, human-friendly way. Not raw JSON. I wanted:
+
+- A big score circle at the top (like a progress ring, 0-100)
+- Color-coded keyword chips (green = present, red = missing)
+- Expandable sections for skill gaps and section feedback
+- Rewrite suggestions shown as before/after comparisons
+
+It built all of it. Some of the component structure it chose was cleaner than what I would have asked for. The before/after comparison cards in particular looked better than what I had in my head.
+
+### Step 5 — The Parts That Broke (And How We Fixed Them)
+
+I'm not going to pretend it was frictionless. A few things broke.
+
+**Problem 1:** The API route was returning the Claude response as a raw string, not parsed JSON. The frontend was crashing trying to render it.
+
+I just told Claude Code what was happening:
+
+> *"The analyze endpoint is returning a string, not parsed JSON. The ResultsPanel is throwing an error when it tries to access matchScore."*
+
+It found the bug — it was missing a `JSON.parse()` call and wasn't handling the case where Claude's response had markdown code fences around the JSON. Fixed in about 30 seconds.
+
+**Problem 2:** Long resumes were hitting Anthropic's token limits and returning incomplete responses.
+
+> *"Some resumes are too long and the API call is failing. Can you add a check that trims the resume to a reasonable token count before sending, and show a warning to the user if we had to truncate it?"*
+
+Done. It added a token estimation function and a yellow warning banner.
+
+**Problem 3:** The PDF upload I asked for initially just wasn't working right. Parsing PDFs in a Next.js API route has a bunch of edge cases.
+
+This one I made a call on: I dropped PDF support from the MVP. I asked Claude Code to replace the file upload with a plain textarea and add a note that says "Copy-paste your resume text here." Not every problem needs to be solved on day one.
+
+That's still vibecoding — knowing when to descope instead of debugging forever.
+
+---
+
+## What Resume-Lens Actually Does Now
+
+Here's the current state of the product:
+
+You land on the page and see two large text areas. Left side is your resume, right side is the job description. You hit **Analyze Resume**.
+
+In a few seconds you get back:
+
+**A match score** — a number from 0 to 100, color-coded (red below 50, yellow 50-75, green above 75). I've found most first-draft resumes score in the 40-60 range against specific job descriptions, even when the person is genuinely qualified.
+
+**Keyword analysis** — a grid of chips showing which keywords from the job description appear in your resume, which are missing, and which are recommended additions that aren't in either but are common in the role. The missing keywords section is usually the most eye-opening part.
+
+**Skill gap breakdown** — separated into "critical" (stuff the job explicitly requires that you didn't mention) and "nice to have" (skills that would strengthen the application).
+
+**Section-by-section feedback** — specific commentary on your experience section, skills section, and education. Not generic advice like "be more specific" — contextual advice like "your experience section mentions project management but doesn't quantify any outcomes, which this role specifically calls for."
+
+**Rewrite suggestions** — these are the most useful. It finds specific bullet points or sentences in your resume and suggests how to rewrite them for this job. Shows the original text, the suggested replacement, and why the change helps.
+
+The whole analysis takes about 8-12 seconds. And every time I test it on a new combination, I learn something about how resume screening actually works.
+
+---
+
+## What Vibecoding Actually Feels Like
+
+I want to be honest about the texture of this experience, because I think it's different from what people expect.
+
+**It's not magic. It's fast iteration.** The product didn't appear from a single prompt. It came from maybe 50-60 exchanges with Claude Code over three days. Some of those were big ("build the results panel") and some were tiny ("make the score circle slightly thicker"). The speed comes from collapsing the feedback loop, not from eliminating the work of thinking.
+
+**You still need to have taste.** Claude Code will build what you describe. If your vision is fuzzy, the output will be fuzzy. The clearer I got about what I actually wanted — not just "make it look good" but "I want a card-based layout with subtle shadows and muted colors, professional not playful" — the better the results.
+
+**You will see code you don't fully understand.** This happened to me constantly. I'd look at what Claude Code wrote and think "I have no idea how that works, but it seems to work." That's uncomfortable if you're a perfectionist. I got over it by reminding myself: the goal is a working product, not a CS degree. I still reviewed for logic — does this do what I asked? Does it expose any obvious security issues? — without needing to understand every line.
+
+**The moments where it surprised me were genuinely fun.** There were a few times where Claude Code built something slightly different from what I asked for, and it was actually better. A loading skeleton animation I didn't ask for. A debounce on the text inputs I didn't think about. It felt collaborative in a way I didn't expect.
+
+---
+
+## Lessons From Someone Who Isn't a Developer
+
+If you're reading this and you're like me — you have product ideas, you understand technology conceptually, but you've never shipped something — here's what I actually learned:
+
+**Start embarrassingly small.** My first prompt was "build a web app called Resume-Lens." That's it. Don't try to spec out every edge case before you've seen anything on screen. Build the skeleton first. The details come from reacting to something real.
+
+**Treat broken things as prompts, not failures.** When something doesn't work, that's just the next message you send to Claude Code. Describe what's wrong. It almost always knows what to do with that.
+
+**Descope aggressively.** I had plans for user accounts, saved analyses, a history view, email exports. None of that is in the MVP. I shipped something useful without any of it. You can always add features later. You can't ship something you haven't finished.
+
+**Read what gets generated.** You don't need to understand it all. But at minimum, understand what it's doing and why. If Claude Code writes an API key into a frontend component, you need to catch that. The judgment layer is still yours.
+
+**The bottleneck moved.** It's not "can I build this?" anymore. It's "is this the right thing to build?" That's a much better problem to have.
+
+---
+
+## What's Next for Resume-Lens
+
+I'm planning to add PDF parsing properly — there are good libraries for it, I just need to commit the time to getting it right. I also want to add a "rewrite mode" where you can take a specific section, paste it in, and get a fully rewritten version optimized for a target role.
+
+Eventually I want to think about whether there's a business here. But right now, honestly, the point was to prove to myself that I could build something real.
+
+I can.
+
+And the thing that started that proof was a YouTube video about a guy named Alex Finn who built his entire life operating system in his terminal and made it look like the most obvious thing in the world.
+
+If you're on the fence about trying this — just try it. The worst case is you spend a weekend and build something that doesn't work. The best case is you realize that the category of "things I could build" is much larger than you thought.
+
+For me, it was both. And I wouldn't trade either part.
+
+---
+
+*Resume-Lens is available at [resume-lens.vercel.app](https://resume-lens.vercel.app). The code is on [GitHub](https://github.com/revinobakmaldi/resume-lens) if you want to see what vibecoded Next.js actually looks like.*
